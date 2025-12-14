@@ -19,7 +19,6 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let debug_fields = data_struct
         .fields
         .iter()
-        .filter(|field| is_not_phantom_data(&field.ty))
         .map(DebugField::new)
         .collect::<Vec<_>>();
 
@@ -68,11 +67,14 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 fn is_phantom_data(ty: &syn::Type) -> bool {
-    matches!(ty, Type::Path(type_path) if type_path.path.is_ident("PhantomData"))
-}
-
-fn is_not_phantom_data(ty: &syn::Type) -> bool {
-    !is_phantom_data(ty)
+    if let Type::Path(type_path) = ty {
+        if type_path.qself.is_none() {
+            if let Some(segment) = type_path.path.segments.last() {
+                return segment.ident == "PhantomData";
+            }
+        }
+    }
+    false
 }
 
 fn data_struct_from_derive_input(
@@ -93,36 +95,48 @@ fn struct_error(derive_input: &DeriveInput, got: &str) -> TokenStream {
     .into_compile_error()
 }
 
+/// Verifies whether a generic parameter is only used within PhantomData fields
 fn is_generic_only_phantom_data(generic: &GenericParam, data_struct: &syn::DataStruct) -> bool {
-    let contains_type_param = |ty: &Type, type_param_ident: &syn::Ident| -> bool {
-        match ty {
-            Type::Path(type_path) => type_path
-                .path
-                .segments
-                .iter()
-                .any(|segment| segment.ident == *type_param_ident),
-            _ => false,
-        }
-    };
-
     if let GenericParam::Type(type_param) = generic {
-        let mut is_mentioned_outside_phantom_data = false;
-
-        for field in &data_struct.fields {
-            if contains_type_param(&field.ty, &type_param.ident) && is_not_phantom_data(&field.ty) {
-                is_mentioned_outside_phantom_data = true;
-                break;
-            }
-        }
-
-        if !is_mentioned_outside_phantom_data {
-            return true;
-        }
+        data_struct
+            .fields
+            .iter()
+            .filter(|f| is_phantom_data(&f.ty))
+            .filter_map(|f| extract_generic_type(&f.ty, "PhantomData"))
+            .any(|inner_ty| {
+                if let Type::Path(type_path) = inner_ty {
+                    if type_path.qself.is_none() {
+                        if let Some(segment) = type_path.path.segments.last() {
+                            return segment.ident == type_param.ident;
+                        }
+                    }
+                }
+                false
+            })
+    } else {
+        false
     }
-
-    false
 }
 
+fn extract_generic_type<'a>(ty: &'a Type, generic_ident: &str) -> Option<&'a Type> {
+    if let Type::Path(type_path) = ty {
+        if type_path.qself.is_none() {
+            if let Some(segment) = type_path.path.segments.last() {
+                if segment.ident == generic_ident {
+                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                        if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
+                            return Some(inner_ty);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Adds `std::fmt::Debug` trait bounds to generic parameters, skipping those which are only used
+/// within PhantomData fields
 fn add_trait_bounds(mut generics: Generics, data_struct: &syn::DataStruct) -> Generics {
     for param in &mut generics.params {
         if is_generic_only_phantom_data(param, data_struct) {
@@ -136,6 +150,7 @@ fn add_trait_bounds(mut generics: Generics, data_struct: &syn::DataStruct) -> Ge
     generics
 }
 
+/// Struct representing a field with optional custom debug format
 struct DebugField {
     ident: syn::Ident,
     format: Option<String>,

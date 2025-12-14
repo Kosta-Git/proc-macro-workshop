@@ -10,11 +10,9 @@ pub struct Field<T, Y> {
     bitmask: u8,
 }
 
-struct NotDebug;
-
 fn main() {
     let f = Field {
-        marker: PhantomData::<NotDebug>,
+        marker: PhantomData::<i32>,
         name: "F",
         bitmask: 0b00011100,
     };
