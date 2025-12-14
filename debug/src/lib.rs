@@ -2,6 +2,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
     parse_macro_input, parse_quote, spanned::Spanned, DeriveInput, Error, GenericParam, Generics,
+    Type,
 };
 
 #[proc_macro_derive(CustomDebug, attributes(debug))]
@@ -18,6 +19,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let debug_fields = data_struct
         .fields
         .iter()
+        .filter(|field| is_not_phantom_data(&field.ty))
         .map(DebugField::new)
         .collect::<Vec<_>>();
 
@@ -48,7 +50,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         .map(|(i, debug_field)| debug_field.as_token_stream(is_last(i)))
         .collect::<Vec<TokenStream>>();
 
-    let generics = add_trait_bounds(input.generics);
+    let generics = add_trait_bounds(input.generics.clone(), data_struct);
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     let expanded = quote! {
@@ -63,6 +65,14 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     };
 
     proc_macro::TokenStream::from(expanded)
+}
+
+fn is_phantom_data(ty: &syn::Type) -> bool {
+    matches!(ty, Type::Path(type_path) if type_path.path.is_ident("PhantomData"))
+}
+
+fn is_not_phantom_data(ty: &syn::Type) -> bool {
+    !is_phantom_data(ty)
 }
 
 fn data_struct_from_derive_input(
@@ -83,8 +93,42 @@ fn struct_error(derive_input: &DeriveInput, got: &str) -> TokenStream {
     .into_compile_error()
 }
 
-fn add_trait_bounds(mut generics: Generics) -> Generics {
+fn is_generic_only_phantom_data(generic: &GenericParam, data_struct: &syn::DataStruct) -> bool {
+    let contains_type_param = |ty: &Type, type_param_ident: &syn::Ident| -> bool {
+        match ty {
+            Type::Path(type_path) => type_path
+                .path
+                .segments
+                .iter()
+                .any(|segment| segment.ident == *type_param_ident),
+            _ => false,
+        }
+    };
+
+    if let GenericParam::Type(type_param) = generic {
+        let mut is_mentioned_outside_phantom_data = false;
+
+        for field in &data_struct.fields {
+            if contains_type_param(&field.ty, &type_param.ident) && is_not_phantom_data(&field.ty) {
+                is_mentioned_outside_phantom_data = true;
+                break;
+            }
+        }
+
+        if !is_mentioned_outside_phantom_data {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn add_trait_bounds(mut generics: Generics, data_struct: &syn::DataStruct) -> Generics {
     for param in &mut generics.params {
+        if is_generic_only_phantom_data(param, data_struct) {
+            continue;
+        }
+
         if let GenericParam::Type(ref mut type_param) = *param {
             type_param.bounds.push(parse_quote!(std::fmt::Debug));
         }
