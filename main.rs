@@ -1,20 +1,17 @@
-// Write code here.
-//
-// To see what the code looks like after macro expansion:
-//     $ cargo expand
-//
-// To run the code:
-//     $ cargo run
-use derive_builder::Builder;
+use derive_debug::CustomDebug;
 
-#[derive(Builder)]
-pub struct Command {
-    executable: String,
-    #[builder(each = "arg")]
-    args: Vec<String>,
-    #[builder(each = "env")]
-    env: Vec<String>,
-    current_dir: String,
+#[derive(CustomDebug)]
+pub struct Field<T> {
+    name: T,
+    #[debug = "0b{:08b}"]
+    bitmask: u8,
 }
 
-fn main() {}
+fn main() {
+    let f = Field {
+        name: "F",
+        bitmask: 0b00011100,
+    };
+
+    println!("{:?}", f);
+}

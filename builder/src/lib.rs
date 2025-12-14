@@ -246,27 +246,18 @@ impl BuilderField {
 }
 
 fn extract_option_inner_type(ty: &Type) -> Option<&Type> {
-    if let Type::Path(type_path) = ty {
-        if type_path.qself.is_none() {
-            if let Some(segment) = type_path.path.segments.last() {
-                if segment.ident == "Option" {
-                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                        if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
-                            return Some(inner_ty);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
+    extract_generic_inner_type(ty, "Option")
 }
 
 fn extract_vec_inner_type(ty: &Type) -> Option<&Type> {
+    extract_generic_inner_type(ty, "Vec")
+}
+
+fn extract_generic_inner_type<'a>(ty: &'a Type, generic_ident: &str) -> Option<&'a Type> {
     if let Type::Path(type_path) = ty {
         if type_path.qself.is_none() {
             if let Some(segment) = type_path.path.segments.last() {
-                if segment.ident == "Vec" {
+                if segment.ident == generic_ident {
                     if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
                         if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
                             return Some(inner_ty);
