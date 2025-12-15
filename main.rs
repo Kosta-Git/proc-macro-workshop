@@ -1,7 +1,17 @@
 use seq::seq;
 
-seq!(N in 0..8 {
-    // nothing
+seq!(N in 1..4 {
+    fn f~N () -> u64 {
+        N * 2
+    }
 });
 
-fn main() {}
+fn f0() -> u64 {
+    100
+}
+
+fn main() {
+    let sum = f0() + f1() + f2() + f3();
+
+    assert_eq!(sum, 100 + 2 + 4 + 6);
+}
