@@ -1,8 +1,10 @@
-use proc_macro::TokenStream;
+use quote::quote;
 
 #[proc_macro]
-pub fn seq(input: TokenStream) -> TokenStream {
+pub fn seq(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let _ = input;
 
-    unimplemented!()
+    let expand = quote! {};
+
+    proc_macro::TokenStream::from(expand)
 }
