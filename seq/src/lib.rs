@@ -49,7 +49,6 @@ fn walk_groups(
     f: &mut dyn FnMut(&TokenStream) -> TokenStream,
 ) -> TokenStream {
     f(tokens)
-        .clone()
         .into_iter()
         .map(|token| {
             use proc_macro2::TokenTree;
