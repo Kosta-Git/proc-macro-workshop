@@ -1,17 +1,42 @@
 use seq::seq;
 
-seq!(N in 1..4 {
-    fn f~N () -> u64 {
-        N * 2
+seq!(N in 0..256 {
+    #[derive(Copy, Clone, PartialEq, Debug)]
+    enum Interrupt {
+        #(
+            Irq~N,
+        )*
     }
 });
 
-fn f0() -> u64 {
-    100
+struct Proc {
+    id: usize,
 }
 
-fn main() {
-    let sum = f0() + f1() + f2() + f3();
-
-    assert_eq!(sum, 100 + 2 + 4 + 6);
+impl Proc {
+    pub const fn new(id: usize, int: [Interrupt; 256]) -> Self {
+        Proc { id }
+    }
 }
+
+// TODO: Move to a test with recursive repeat groups
+const PROCS: [Proc; 256] = {
+    seq!(N in 0..256 {
+        [
+            #(
+                Proc::new(
+                    N,
+                    {
+                        [
+                        #(
+                            Interrupt::Irq~N,
+                        )*
+                        ]
+                    }
+                ),
+            )*
+        ]
+    })
+};
+
+fn main() {}

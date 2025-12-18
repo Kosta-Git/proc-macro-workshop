@@ -28,6 +28,12 @@ seq!(N in 1..4 {
     }
 });
 
+seq!(N in 1..4 {
+    fn f~N~_u64 () -> u64 {
+        N * 2
+    }
+});
+
 // This f0 is written separately to detect whether your macro correctly starts
 // with the first iteration at N=1 as specified in the invocation. If the macro
 // incorrectly started at N=0 like in the previous tests cases, the first
@@ -39,6 +45,8 @@ fn f0() -> u64 {
 
 fn main() {
     let sum = f0() + f1() + f2() + f3();
+    let sum_suffix = f0() + f1_u64() + f2_u64() + f3_u64();
 
     assert_eq!(sum, 100 + 2 + 4 + 6);
+    assert_eq!(sum_suffix, 100 + 2 + 4 + 6);
 }
